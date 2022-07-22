@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request, render_template, make_response, jsonify
 
 app = Flask("PDF-coverter")
 
@@ -14,9 +14,16 @@ def main():
     """
     Receives POST requests and processes the file
     """
-    f = request.files['document']
-    f.save(f.filename)
-    return "Got your file!"
+    link = "https://example.com"
+    resp = {'link': link}
+    return make_response(jsonify(resp), 200)
+
+@app.route('/', methods=['GET'])
+def home():
+    """
+    Process GET request
+    """
+    return render_template('form.html')
 
 
 if __name__ == "__main__":
