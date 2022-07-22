@@ -14,8 +14,6 @@ def main():
     """
     Receives POST requests and processes the file
     """
-    print(request.form)
-    print(request.files)
     link = "https://example.com"
     resp = {'link': link}
     return make_response(jsonify(resp), 200)

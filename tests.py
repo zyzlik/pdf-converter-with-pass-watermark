@@ -26,7 +26,7 @@ class TestFileUpload:
             content_type="multipart/form-data",
         )
         assert response.status_code == 200
-        assert response.data.decode('utf-8') == "Got your file!"
+        assert response.data.decode('utf-8') == '{"link":"https://example.com"}\n'
 
 class TestDocument:
 
