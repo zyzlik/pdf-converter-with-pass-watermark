@@ -48,6 +48,6 @@ class TestDocument:
         assert os.path.exists("test_image.pdf")
         os.remove("test_image.pdf")
     
-    def test_convert_file(self):
-        self.d.convert_file_to_pdf("tests/test_file.docx")
-        assert os.path.exists("test_file.pdf")
+    # def test_convert_file(self):
+    #     self.d.convert_file_to_pdf("tests/test_file.docx")
+    #     assert os.path.exists("test_file.pdf")
