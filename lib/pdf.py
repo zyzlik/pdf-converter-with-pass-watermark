@@ -32,6 +32,11 @@ class BaseFile:
         _, filename = os.path.split(path)
         return filename
     
+    def get_filename_no_ext(self, path):
+        _, filename = os.path.split(path)
+        filename_no_ext = os.path.splitext(filename)[0]
+        return filename_no_ext
+    
     def add_prefix_to_filename(self, path, prefix):
         folder, filename = os.path.split(path)
         filename = f"{prefix}_{filename}"
@@ -58,27 +63,27 @@ class Document(BaseFile):
         self.watermark = watermark
         # List of pdf docs paths to merge at the end
         self.pages = list()
-        self.allowed_formats = ("pdf", "docx", "png", "jpg", "jpeg")
+        self.allowed_formats = (".pdf", ".docx", ".png", ".jpg", ".jpeg")
     
     def process(self):
         for f in self.files:
             if self.get_extension(f) in IMAGE_EXTENSIONS:
-                filename = self.apply_watermark(f)
+                filename = self.apply_image_watermark(f)
                 pdf = self.convert_image_to_pdf(filename)
             if self.get_extension(f) in FILE_EXTENSIONS:
                 pdf = self.convert_file_to_pdf(f)
+                filename = self.apply_pdf_watermark(pdf)
             if self.get_extension(f) in PDF_EXTENSIONS:
-                pdf = f
+                self.apply_pdf_watermark(f)
             self.pages.append(pdf)
         filename = self.save()
-        self.apply_watermark(filename)
     
     def validate_all(self):
         for f in self.files:
             self.validate(f)
     
     def validate(self, f):
-        extension = self.get_extension(f)
+        extension = self.get_extension(f).lower()
         if extension in self.allowed_formats:
             return
         raise UnprocessibleFileException(f"{extension} is not a valid format")
@@ -89,7 +94,7 @@ class Document(BaseFile):
         """
         image = Image.open(path)
         pdf = image.convert("RGB")
-        filename = self.get_filename(path)
+        filename = self.get_filename_no_ext(path)
         pdf.save(f"{filename}.pdf")
         return f"{filename}.pdf"
     
@@ -97,14 +102,24 @@ class Document(BaseFile):
     #     filename = self.get_filename(path)
     #     convert(path, f"{filename}.pdf")
         
-    def apply_watermark(self, f):
+    def apply_image_watermark(self, f):
         """
-        Merge watermark PDF with files
+        Apply watermark to a file
         :param f str: file path
         """
 
         w = Watermark(self.watermark, f)
         filename = w.create_image_with_watermark()
+        return filename
+    
+    def apply_pdf_watermark(self, f):
+        """
+        Apply watermark to a file
+        :param f str: file path
+        """
+
+        w = Watermark(self.watermark, f)
+        filename = w.create_pdf_with_watermark()
         return filename
 
     def encrypt(self):
