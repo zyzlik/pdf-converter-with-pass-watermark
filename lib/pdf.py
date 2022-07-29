@@ -211,7 +211,7 @@ class Watermark(BaseFile):
         """
 
         image = Image.open(self.path).convert("RGBA")
-        font = self.get_right_font(min(image.size))
+        font = self.get_right_font_pil(min(image.size))
         txt = Image.new("RGBA", image.size, (255, 255, 255, 0))
 
         draw = ImageDraw.Draw(txt)

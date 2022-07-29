@@ -80,8 +80,8 @@ class TestDocument:
     def test_apply_pdf_watermark(self):
         self.d.watermark = "kseniia churiumova"
         filename = self.d.apply_pdf_watermark("tests/test_pdf.pdf")
-        assert filename == "watermark.pdf"
-        assert os.path.exists("watermark.pdf")
+        assert filename == "tests/test_pdf.pdf"
+        assert os.path.exists("tests/test_pdf.pdf")
         os.remove("watermark.pdf")
     
     # def test_convert_file(self):
