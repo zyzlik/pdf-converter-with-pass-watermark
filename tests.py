@@ -77,6 +77,13 @@ class TestDocument:
         assert os.path.exists("tests/watermark_test_image.png")
         os.remove("tests/watermark_test_image.png")
     
+    def test_apply_pdf_watermark(self):
+        self.d.watermark = "kseniia churiumova"
+        filename = self.d.apply_pdf_watermark("tests/test_pdf.pdf")
+        assert filename == "watermark.pdf"
+        assert os.path.exists("watermark.pdf")
+        os.remove("watermark.pdf")
+    
     # def test_convert_file(self):
     #     self.d.convert_file_to_pdf("tests/test_file.docx")
     #     assert os.path.exists("test_file.pdf")

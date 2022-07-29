@@ -1,13 +1,14 @@
 from math import floor, ceil
 import os
 
+from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont
-from PyPDF2 import PdfReader, PdfWriter
+from PyPDF2 import PdfReader, PdfWriter, _page
 
 
 FILE_EXTENSIONS = {".docx"}
 FINAL_PDF_PATH = "document.pdf"
-FONT_START_SIZE = 300
+FONT_START_SIZE = 200
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 PADDING = 20
 PDF_DIMENSIONS = (2480, 3508)
@@ -72,9 +73,10 @@ class Document(BaseFile):
                 pdf = self.convert_image_to_pdf(filename)
             if self.get_extension(f) in FILE_EXTENSIONS:
                 pdf = self.convert_file_to_pdf(f)
-                filename = self.apply_pdf_watermark(pdf)
+                pdf = self.apply_pdf_watermark(pdf)
             if self.get_extension(f) in PDF_EXTENSIONS:
                 self.apply_pdf_watermark(f)
+                pdf = f
             self.pages.append(pdf)
         filename = self.save()
     
@@ -108,7 +110,7 @@ class Document(BaseFile):
         :param f str: file path
         """
 
-        w = Watermark(self.watermark, f)
+        w = Watermark(self.watermark, f=f)
         filename = w.create_image_with_watermark()
         return filename
     
@@ -117,10 +119,55 @@ class Document(BaseFile):
         Apply watermark to a file
         :param f str: file path
         """
+        reader = PdfReader(f)
+        writer = PdfWriter()
+        for page in reader.pages:
+            width = ceil(page.mediabox.width)
+            height = ceil(page.mediabox.height)
+            w = Watermark(self.watermark, dimensions=(width, height))
+            filename = w.create_pdf_with_watermark()
+            new_page = self.merge_watermark_pdf(page, filename)
+            writer.add_page(new_page)
+        with open(f, "wb") as fb:
+            writer.write(fb)
+        return f
+    
+    def merge_watermark_pdf(self, page, watermark):
+        if not page.extract_text():
+            return self.merge_as_stamp(page, watermark)
+        else:
+            return self.merge_as_watermark(page, watermark)
+    
+    def merge_as_stamp(self, page: _page.PageObject, watermark: str):
+        """
+        For not digital generated PDF such as images or scans
+        We can't put watermark under it, so we put on top
+        """
 
-        w = Watermark(self.watermark, f)
-        filename = w.create_pdf_with_watermark()
-        return filename
+        print("Stamping watermark over the page")
+        watermark_reader = PdfReader(watermark)
+        watermark = watermark_reader.pages[0]
+
+        mediabox = page.mediabox
+        
+        page.merge_page(watermark)
+        page.mediabox = mediabox
+        return page
+    
+    def merge_as_watermark(self, page: _page.PageObject, watermark: str):
+        """
+        For digital-generated PDF we can put watermark under the page content
+        """
+
+        print("Adding watermark underneath the page")
+        watermark_reader = PdfReader(watermark)
+        watermark = watermark_reader.pages[0]
+        
+        mediabox = page.mediabox
+
+        watermark.merge_page(page)
+        watermark.mediabox = mediabox
+        return watermark
 
     def encrypt(self):
         """
@@ -142,7 +189,7 @@ class Document(BaseFile):
 
 
 class Watermark(BaseFile):
-    def __init__(self, watermark: str, f: str):
+    def __init__(self, watermark: str, f: str = "", dimensions: tuple = None):
         """
         Class to create a pdf file with watermark word across the page
         :param watermark str: watermark word
@@ -150,6 +197,7 @@ class Watermark(BaseFile):
 
         self.watermark = watermark
         self.path = f
+        self.dimensions = dimensions
     
     def add_watermark(self):
         if self.get_extension(self.path) in IMAGE_EXTENSIONS:
@@ -168,7 +216,8 @@ class Watermark(BaseFile):
 
         draw = ImageDraw.Draw(txt)
 
-        center_image_width = self.get_center_width(txt.size[0], font)
+        word_length = font.getLength(self.watermark)
+        center_image_width = self.get_center_width(txt.size[0], word_length)
         center_image_length = self.get_center_length(txt.size[1], font)
 
         # Draw on top in the center
@@ -190,36 +239,40 @@ class Watermark(BaseFile):
         out.save(new_filename)
         return new_filename
     
-    def create_pdf_with_watermark(self, dimensions=None):
+    def create_pdf_with_watermark(self):
         """
-        Helper method to create a new image 
-        and add text across it then
-        convert to PDF
+        Helper method to create a new PDF document 
+        and add text to it
         """
-
-        if not dimensions:
-            dimensions = PDF_DIMENSIONS
         
-        image = Image.new('RGBA', dimensions, (255, 255, 255, 255))
-        font = self.get_right_font(min(dimensions))
-        draw = ImageDraw.Draw(image)
+        pdf = FPDF('P', 'pt', (self.dimensions))
+        pdf.add_font("Roboto", "", "Roboto-Bold.ttf", uni=True)
 
-        conter_image_width = self.get_center_width(dimensions[0], font)
-        center_image_length = self.get_center_length(dimensions[1], font)
-        
-        # Draw on top in the center
-        draw.text((conter_image_width, 0 + PADDING), self.watermark,  font=font, fill=WATERMARK_COLOR)
+        self.set_right_font_fpdf(self.dimensions[0], pdf)
+        pdf.set_text_color(128, 128, 128)
+        pdf.add_page()
 
-        # Draw in the center
-        draw.text((conter_image_width, center_image_length), self.watermark,  font=font, fill=WATERMARK_COLOR)
+        word_length = pdf.get_string_width(self.watermark)
 
-        # Draw at the bottom
-        draw.text((conter_image_width, dimensions[1] - PADDING - self.get_text_height(font)), self.watermark,  font=font, fill=WATERMARK_COLOR)      
+        center_image_width = self.get_center_width(self.dimensions[0], word_length)
+        center_image_height = self.dimensions[1] / 2 - ceil(pdf.font_size) / 2
+        padding_from_bottom = self.dimensions[1] - PADDING * 2 - ceil(pdf.font_size) - pdf.b_margin
 
-        self.image = image.convert("RGB")
-        self.image.save(WATERMARK_PATH)
+        pdf.cell(word_length + PADDING * 2, pdf.font_size + PADDING * 2, self.watermark, 0, 1, 'C')
+
+        pdf.set_x(center_image_width)
+        pdf.set_y(center_image_height)
+        pdf.cell(word_length + PADDING * 2, pdf.font_size, self.watermark, 0, 1, 'C')
+
+        pdf.set_y(padding_from_bottom)
+        print("Height: " + str(self.dimensions[1]))
+        print("printing at the bottom at " + str(padding_from_bottom))
+        pdf.cell(word_length + PADDING * 2, pdf.font_size + PADDING * 2, self.watermark, 0, 1, 'C')
+
+        pdf.output('watermark.pdf', 'F')
+        return WATERMARK_PATH
     
-    def get_right_font(self, max_length):
+    def get_right_font_pil(self, max_length):
         font_size = FONT_START_SIZE
         font = ImageFont.truetype("Roboto-Bold.ttf", size=font_size)
         length = font.getlength(self.watermark)
@@ -229,10 +282,18 @@ class Watermark(BaseFile):
             length = font.getlength(self.watermark)
         return font
     
-    def get_center_width(self, width, font):
-        text_length = font.getlength(self.watermark)
-        conter_image_width = width / 2 - text_length / 2
-        return floor(conter_image_width)
+    def set_right_font_fpdf(self, max_length, pdf):
+        font_size = FONT_START_SIZE
+        pdf.set_font("Roboto", "", font_size)
+        length = pdf.get_string_width(self.watermark)
+        while length > max_length - PADDING * 2:
+            font_size -= PADDING
+            pdf.set_font("Roboto", "", font_size)
+            length = pdf.get_string_width(self.watermark)
+    
+    def get_center_width(self, width, text_length):
+        center_image_width = width / 2 - text_length / 2
+        return floor(center_image_width)
     
     def get_center_length(self, length, font):
         text_height = self.get_text_height(font)
