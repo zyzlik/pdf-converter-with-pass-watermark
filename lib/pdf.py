@@ -216,7 +216,7 @@ class Watermark(BaseFile):
 
         draw = ImageDraw.Draw(txt)
 
-        word_length = font.getLength(self.watermark)
+        word_length = font.getlength(self.watermark)
         center_image_width = self.get_center_width(txt.size[0], word_length)
         center_image_length = self.get_center_length(txt.size[1], font)
 
