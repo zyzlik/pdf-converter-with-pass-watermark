@@ -68,7 +68,13 @@ class Document(BaseFile):
         self.allowed_formats = (".pdf", ".docx", ".png", ".jpg", ".jpeg")
     
     def process(self):
+        """
+        Main function:
+        Goes through files, calls the methods to add watermarks,
+        Converts to PDF and encrypts
+        """
         for f in self.files:
+            print("Processing {}".format(f))
             if self.get_extension(f) in IMAGE_EXTENSIONS:
                 filename = self.apply_image_watermark(f)
                 pdf = self.convert_image_to_pdf(filename)
@@ -101,9 +107,10 @@ class Document(BaseFile):
     
     def convert_image_to_pdf(self, path):
         """
-        Conver image files to PDF, saves locally
+        Convert image files to PDF, saves locally
         """
 
+        print("Converting {} to pdf".format(path))
         pdf = FPDF("P", 'mm', 'A4')
         pdf.add_page()
         pdf.image(path, 0, 0, pdf.w, pdf.h)
@@ -277,8 +284,6 @@ class Watermark(BaseFile):
         pdf.cell(word_length + PADDING * 2, pdf.font_size, self.watermark, 0, 1, 'C')
 
         pdf.set_y(padding_from_bottom)
-        print("Height: " + str(self.dimensions[1]))
-        print("printing at the bottom at " + str(padding_from_bottom))
         pdf.cell(word_length + PADDING * 2, pdf.font_size + PADDING * 2, self.watermark, 0, 1, 'C')
 
         pdf.output('watermark.pdf', 'F')
