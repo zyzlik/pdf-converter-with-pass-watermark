@@ -3,9 +3,10 @@ import os
 
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont
-from PyPDF2 import PdfReader, PdfWriter, _page
+from PyPDF2 import PdfMerger, PdfReader, PdfWriter, _page
 
 
+A4_SIZE = (595, 842,)
 FILE_EXTENSIONS = {".docx"}
 FINAL_PDF_PATH = "document.pdf"
 FONT_START_SIZE = 200
@@ -78,7 +79,15 @@ class Document(BaseFile):
                 self.apply_pdf_watermark(f)
                 pdf = f
             self.pages.append(pdf)
-        filename = self.save()
+        self.merge_pages()
+        self.encrypt()
+    
+    def merge_pages(self):
+        merger = PdfMerger()
+        for pdf in self.pages:
+            merger.append(pdf)
+        merger.write(FINAL_PDF_PATH)
+        merger.close()
     
     def validate_all(self):
         for f in self.files:
@@ -94,10 +103,13 @@ class Document(BaseFile):
         """
         Conver image files to PDF, saves locally
         """
-        image = Image.open(path)
-        pdf = image.convert("RGB")
+
+        pdf = FPDF("P", 'mm', 'A4')
+        pdf.add_page()
+        pdf.image(path, 0, 0, pdf.w, pdf.h)
+
         filename = self.get_filename_no_ext(path)
-        pdf.save(f"{filename}.pdf")
+        pdf.output(f"{filename}.pdf")
         return f"{filename}.pdf"
     
     # def convert_file_to_pdf(self, path):
