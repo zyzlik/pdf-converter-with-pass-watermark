@@ -147,7 +147,8 @@ class Document(BaseFile):
             filename = w.create_pdf_with_watermark()
             new_page = self.merge_watermark_pdf(page, filename)
             writer.add_page(new_page)
-        with open(f, "wb") as fb:
+        new_filename = self.add_prefix_to_filename(f, "watermark")
+        with open(new_filename, "wb") as fb:
             writer.write(fb)
         return f
     
@@ -254,7 +255,7 @@ class Watermark(BaseFile):
 
         # Save file
         out = out.convert("RGB")
-        filename = self.change_extension(self.path, "jpg")
+        filename = self.change_extension(self.path, "jpeg")
         new_filename = self.add_prefix_to_filename(filename, "watermark")
         out.save(new_filename)
         return new_filename

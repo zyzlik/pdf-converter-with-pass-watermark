@@ -1,5 +1,6 @@
 import os
 
+from PyPDF2 import PdfReader
 import pytest
 from werkzeug.datastructures import FileStorage
 
@@ -21,6 +22,10 @@ class TestBaseFile:
     def test_get_extension(self):
         ext = self.b.get_extension("tests/test_file.docx")
         assert ext == ".docx"
+    
+    def test_get_filename_no_ext(self):
+        filename_no_ext = self.b.get_filename_no_ext("tests/document.pdf")
+        assert filename_no_ext == "document"
     
     def test_get_filename(self):
         filename = self.b.get_filename("tests/test_file.docx")
@@ -65,6 +70,24 @@ class TestDocument:
     def test_validate_caps(self):
         self.d.validate("three.JPEG")
     
+    def test_process(self):
+        d = Document(
+            files=["tests/test_pdf.pdf", "tests/test_image.jpeg"],
+            password="qwerty",
+            watermark="kseniia"
+        )
+        d.process()
+        assert os.path.exists("document.pdf")
+        os.remove("document.pdf")
+    
+    def test_merge_pages(self):
+        self.d.pages = ["tests/test_pdf.pdf", "tests/test_text_pdf.pdf"]
+        self.d.merge_pages()
+        assert os.path.exists("document.pdf")
+        reader = PdfReader("document.pdf")
+        assert len(reader.pages) == 7
+        os.remove("document.pdf")
+    
     def test_convert_image(self):
         self.d.convert_image_to_pdf("tests/test_image.jpeg")
         assert os.path.exists("test_image.pdf")
@@ -73,16 +96,17 @@ class TestDocument:
     def test_apply_image_watermark(self):
         self.d.watermark = "kseniia churiumova"
         filename = self.d.apply_image_watermark("tests/test_image.jpeg")
-        assert filename == "tests/watermark_test_image.png"
-        assert os.path.exists("tests/watermark_test_image.png")
-        os.remove("tests/watermark_test_image.png")
+        assert filename == "tests/watermark_test_image.jpeg"
+        assert os.path.exists("tests/watermark_test_image.jpeg")
+        os.remove("tests/watermark_test_image.jpeg")
     
     def test_apply_pdf_watermark(self):
         self.d.watermark = "kseniia churiumova"
         filename = self.d.apply_pdf_watermark("tests/test_pdf.pdf")
-        assert filename == "tests/test_pdf.pdf"
-        assert os.path.exists("tests/test_pdf.pdf")
+        assert filename == "tests/watermark_test_pdf.pdf"
+        assert os.path.exists("tests/watermark_test_pdf.pdf")
         os.remove("watermark.pdf")
+        os.remove("tests/watermark_test_pdf.pdf")
     
     # def test_convert_file(self):
     #     self.d.convert_file_to_pdf("tests/test_file.docx")
