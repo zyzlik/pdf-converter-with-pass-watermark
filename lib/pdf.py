@@ -2,7 +2,7 @@ from math import floor, ceil
 import os
 
 from fpdf import FPDF
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 from PyPDF2 import PdfMerger, PdfReader, PdfWriter, _page
 
 
@@ -230,7 +230,8 @@ class Watermark(BaseFile):
         """
 
         image = Image.open(self.path).convert("RGBA")
-        font = self.get_right_font_pil(min(image.size))
+        image = ImageOps.exif_transpose(image)
+        font = self.get_right_font_pil(image.size[0])
         txt = Image.new("RGBA", image.size, (255, 255, 255, 0))
 
         draw = ImageDraw.Draw(txt)
@@ -252,9 +253,9 @@ class Watermark(BaseFile):
         out = Image.alpha_composite(image, txt)
 
         # Save file
-        if self.get_extension(self.path) != ".png":
-            self.path = self.change_extension(self.path, "png")
-        new_filename = self.add_prefix_to_filename(self.path, "watermark")
+        out = out.convert("RGB")
+        filename = self.change_extension(self.path)
+        new_filename = self.add_prefix_to_filename(filename, "watermark")
         out.save(new_filename)
         return new_filename
     
