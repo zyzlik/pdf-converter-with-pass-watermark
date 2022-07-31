@@ -2,16 +2,16 @@ from math import floor, ceil
 import os
 
 from fpdf import FPDF
-from PIL import Image, ImageDraw, ImageFont
-from PyPDF2 import PdfReader, PdfWriter, _page
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+from PyPDF2 import PdfMerger, PdfReader, PdfWriter, _page
 
 
+A4_SIZE = (595, 842,)
 FILE_EXTENSIONS = {".docx"}
 FINAL_PDF_PATH = "document.pdf"
 FONT_START_SIZE = 200
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
 PADDING = 20
-PDF_DIMENSIONS = (2480, 3508)
 PDF_EXTENSIONS = {".pdf"}
 WATERMARK_COLOR = (128, 128, 128, 100)
 WATERMARK_PATH = "watermark.pdf"
@@ -67,7 +67,13 @@ class Document(BaseFile):
         self.allowed_formats = (".pdf", ".docx", ".png", ".jpg", ".jpeg")
     
     def process(self):
+        """
+        Main function:
+        Goes through files, calls the methods to add watermarks,
+        Converts to PDF and encrypts
+        """
         for f in self.files:
+            print("Processing {}".format(f))
             if self.get_extension(f) in IMAGE_EXTENSIONS:
                 filename = self.apply_image_watermark(f)
                 pdf = self.convert_image_to_pdf(filename)
@@ -78,7 +84,15 @@ class Document(BaseFile):
                 self.apply_pdf_watermark(f)
                 pdf = f
             self.pages.append(pdf)
-        filename = self.save()
+        self.merge_pages()
+        self.encrypt(FINAL_PDF_PATH)
+    
+    def merge_pages(self):
+        merger = PdfMerger()
+        for pdf in self.pages:
+            merger.append(pdf)
+        merger.write(FINAL_PDF_PATH)
+        merger.close()
     
     def validate_all(self):
         for f in self.files:
@@ -92,12 +106,16 @@ class Document(BaseFile):
     
     def convert_image_to_pdf(self, path):
         """
-        Conver image files to PDF, saves locally
+        Convert image files to PDF, saves locally
         """
-        image = Image.open(path)
-        pdf = image.convert("RGB")
+
+        print("Converting {} to pdf".format(path))
+        pdf = FPDF("P", 'mm', 'A4')
+        pdf.add_page()
+        pdf.image(path, 0, 0, pdf.w, pdf.h)
+
         filename = self.get_filename_no_ext(path)
-        pdf.save(f"{filename}.pdf")
+        pdf.output(f"{filename}.pdf")
         return f"{filename}.pdf"
     
     # def convert_file_to_pdf(self, path):
@@ -111,7 +129,7 @@ class Document(BaseFile):
         """
 
         w = Watermark(self.watermark, f=f)
-        filename = w.create_image_with_watermark()
+        filename = w.add_watermark()
         return filename
     
     def apply_pdf_watermark(self, f):
@@ -125,12 +143,13 @@ class Document(BaseFile):
             width = ceil(page.mediabox.width)
             height = ceil(page.mediabox.height)
             w = Watermark(self.watermark, dimensions=(width, height))
-            filename = w.create_pdf_with_watermark()
+            filename = w.add_watermark()
             new_page = self.merge_watermark_pdf(page, filename)
             writer.add_page(new_page)
-        with open(f, "wb") as fb:
+        new_filename = self.add_prefix_to_filename(f, "watermark")
+        with open(new_filename, "wb") as fb:
             writer.write(fb)
-        return f
+        return new_filename
     
     def merge_watermark_pdf(self, page, watermark):
         if not page.extract_text():
@@ -169,11 +188,11 @@ class Document(BaseFile):
         watermark.mediabox = mediabox
         return watermark
 
-    def encrypt(self):
+    def encrypt(self, path):
         """
         Add password
         """
-        reader = PdfReader(FINAL_PDF_PATH)
+        reader = PdfReader(path)
         writer = PdfWriter()
 
         # Add all pages to the writer
@@ -184,7 +203,7 @@ class Document(BaseFile):
         writer.encrypt(self.password)
 
         # Save the new PDF to a file
-        with open(FINAL_PDF_PATH, "wb") as f:
+        with open(path, "wb") as f:
             writer.write(f)
 
 
@@ -201,24 +220,25 @@ class Watermark(BaseFile):
     
     def add_watermark(self):
         if self.get_extension(self.path) in IMAGE_EXTENSIONS:
-            self.create_image_with_watermark()
+            return self._create_image_with_watermark()
         else:
-            self.create_pdf_with_watermark()
+            return self._create_pdf_with_watermark()
     
-    def create_image_with_watermark(self):
+    def _create_image_with_watermark(self):
         """
         Helper method to add watermark to an image
         """
 
         image = Image.open(self.path).convert("RGBA")
-        font = self.get_right_font_pil(min(image.size))
+        image = ImageOps.exif_transpose(image)
+        font = self._get_right_font_pil(image.size[0])
         txt = Image.new("RGBA", image.size, (255, 255, 255, 0))
 
         draw = ImageDraw.Draw(txt)
 
         word_length = font.getlength(self.watermark)
-        center_image_width = self.get_center_width(txt.size[0], word_length)
-        center_image_length = self.get_center_length(txt.size[1], font)
+        center_image_width = self._get_center_width(txt.size[0], word_length)
+        center_image_length = self._get_center_length(txt.size[1], font)
 
         # Draw on top in the center
         draw.text((center_image_width, 0 + PADDING), self.watermark,  font=font, fill=WATERMARK_COLOR)
@@ -227,19 +247,19 @@ class Watermark(BaseFile):
         draw.text((center_image_width, center_image_length), self.watermark,  font=font, fill=WATERMARK_COLOR)
 
         # Draw at the bottom
-        draw.text((center_image_width, txt.size[1] - PADDING - self.get_text_height(font)), self.watermark,  font=font, fill=WATERMARK_COLOR)      
+        draw.text((center_image_width, txt.size[1] - PADDING - self._get_text_height(font)), self.watermark,  font=font, fill=WATERMARK_COLOR)      
         
         # Merge images
         out = Image.alpha_composite(image, txt)
 
         # Save file
-        if self.get_extension(self.path) != ".png":
-            self.path = self.change_extension(self.path, "png")
-        new_filename = self.add_prefix_to_filename(self.path, "watermark")
+        out = out.convert("RGB")
+        filename = self.change_extension(self.path, "jpeg")
+        new_filename = self.add_prefix_to_filename(filename, "watermark")
         out.save(new_filename)
         return new_filename
     
-    def create_pdf_with_watermark(self):
+    def _create_pdf_with_watermark(self):
         """
         Helper method to create a new PDF document 
         and add text to it
@@ -248,13 +268,13 @@ class Watermark(BaseFile):
         pdf = FPDF('P', 'pt', (self.dimensions))
         pdf.add_font("Roboto", "", "Roboto-Bold.ttf", uni=True)
 
-        self.set_right_font_fpdf(self.dimensions[0], pdf)
+        self._set_right_font_fpdf(self.dimensions[0], pdf)
         pdf.set_text_color(128, 128, 128)
         pdf.add_page()
 
         word_length = pdf.get_string_width(self.watermark)
 
-        center_image_width = self.get_center_width(self.dimensions[0], word_length)
+        center_image_width = self._get_center_width(self.dimensions[0], word_length)
         center_image_height = self.dimensions[1] / 2 - ceil(pdf.font_size) / 2
         padding_from_bottom = self.dimensions[1] - PADDING * 2 - ceil(pdf.font_size) - pdf.b_margin
 
@@ -265,14 +285,12 @@ class Watermark(BaseFile):
         pdf.cell(word_length + PADDING * 2, pdf.font_size, self.watermark, 0, 1, 'C')
 
         pdf.set_y(padding_from_bottom)
-        print("Height: " + str(self.dimensions[1]))
-        print("printing at the bottom at " + str(padding_from_bottom))
         pdf.cell(word_length + PADDING * 2, pdf.font_size + PADDING * 2, self.watermark, 0, 1, 'C')
 
-        pdf.output('watermark.pdf', 'F')
+        pdf.output(WATERMARK_PATH, 'F')
         return WATERMARK_PATH
     
-    def get_right_font_pil(self, max_length):
+    def _get_right_font_pil(self, max_length):
         font_size = FONT_START_SIZE
         font = ImageFont.truetype("Roboto-Bold.ttf", size=font_size)
         length = font.getlength(self.watermark)
@@ -282,7 +300,7 @@ class Watermark(BaseFile):
             length = font.getlength(self.watermark)
         return font
     
-    def set_right_font_fpdf(self, max_length, pdf):
+    def _set_right_font_fpdf(self, max_length, pdf):
         font_size = FONT_START_SIZE
         pdf.set_font("Roboto", "", font_size)
         length = pdf.get_string_width(self.watermark)
@@ -291,16 +309,16 @@ class Watermark(BaseFile):
             pdf.set_font("Roboto", "", font_size)
             length = pdf.get_string_width(self.watermark)
     
-    def get_center_width(self, width, text_length):
+    def _get_center_width(self, width, text_length):
         center_image_width = width / 2 - text_length / 2
         return floor(center_image_width)
     
-    def get_center_length(self, length, font):
-        text_height = self.get_text_height(font)
+    def _get_center_length(self, length, font):
+        text_height = self._get_text_height(font)
         center_image_length = length / 2 - text_height / 2
         return ceil(center_image_length)
     
-    def get_text_height(self, font):
+    def _get_text_height(self, font):
         text_box = font.getbbox(self.watermark)
         text_height = text_box[3] - text_box[1]
         return ceil(text_height)
