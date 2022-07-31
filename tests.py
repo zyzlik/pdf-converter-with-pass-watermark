@@ -1,6 +1,7 @@
 import os
+import shutil
 
-from PyPDF2 import PdfReader
+from PyPDF2 import errors, _page, PdfReader
 import pytest
 from werkzeug.datastructures import FileStorage
 
@@ -85,7 +86,7 @@ class TestDocument:
         self.d.merge_pages()
         assert os.path.exists("document.pdf")
         reader = PdfReader("document.pdf")
-        assert len(reader.pages) == 7
+        assert len(reader.pages) == 8
         os.remove("document.pdf")
     
     def test_convert_image(self):
@@ -107,6 +108,39 @@ class TestDocument:
         assert os.path.exists("tests/watermark_test_pdf.pdf")
         os.remove("watermark.pdf")
         os.remove("tests/watermark_test_pdf.pdf")
+    
+    def test_merge_watermark_pdf(self):
+        reader = PdfReader("tests/test_pdf.pdf")
+        page = reader.pages[0]
+        out = self.d.merge_watermark_pdf(page, "tests/test.pdf")
+        assert type(out) == _page
+    
+    def test_merge_as_stamp(self):
+        reader = PdfReader("tests/test_pdf.pdf")
+        page = reader.pages[0]
+        out = self.d.merge_as_stamp(page, "tests/test.pdf")
+        assert type(out) == _page
+    
+    def test_merge_as_watermark(self):
+        reader = PdfReader("tests/test_pdf.pdf")
+        page = reader.pages[0]
+        out = self.d.merge_as_watermark(page, "tests/test.pdf")
+        assert type(out) == _page
+    
+    def test_encrypt(self):
+        shutil.copyfile("tests/test_pdf.pdf", "tests/test_encrypt.pdf")
+        self.d.encrypt("tests/test_encrypt.pdf")
+        reader = PdfReader("tests/test_encrypt.pdf")
+        with pytest.raises(errors.PdfReadError):
+            reader.documentInfo
+        # With wrong password
+        result = reader.decrypt("wrong")
+        assert result.name == "NOT_DECRYPTED"
+        result = reader.decrypt(self.d.password)
+        assert result.name == "OWNER_PASSWORD"
+        # Now we can read document info
+        reader.documentInfo
+        os.remove("tests/test_encrypt.pdf")
     
     # def test_convert_file(self):
     #     self.d.convert_file_to_pdf("tests/test_file.docx")

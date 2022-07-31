@@ -86,7 +86,7 @@ class Document(BaseFile):
                 pdf = f
             self.pages.append(pdf)
         self.merge_pages()
-        self.encrypt()
+        self.encrypt(FINAL_PDF_PATH)
     
     def merge_pages(self):
         merger = PdfMerger()
@@ -189,11 +189,11 @@ class Document(BaseFile):
         watermark.mediabox = mediabox
         return watermark
 
-    def encrypt(self):
+    def encrypt(self, path):
         """
         Add password
         """
-        reader = PdfReader(FINAL_PDF_PATH)
+        reader = PdfReader(path)
         writer = PdfWriter()
 
         # Add all pages to the writer
@@ -204,7 +204,7 @@ class Document(BaseFile):
         writer.encrypt(self.password)
 
         # Save the new PDF to a file
-        with open(FINAL_PDF_PATH, "wb") as f:
+        with open(path, "wb") as f:
             writer.write(f)
 
 
