@@ -1,6 +1,8 @@
 import os
 import shutil
+from unittest import mock
 
+from PIL import ImageFont
 from PyPDF2 import errors, _page, PdfReader
 import pytest
 from werkzeug.datastructures import FileStorage
@@ -80,6 +82,10 @@ class TestDocument:
         d.process()
         assert os.path.exists("document.pdf")
         os.remove("document.pdf")
+        os.remove("tests/watermark_test_image.jpeg")
+        os.remove("tests/watermark_test_pdf.pdf")
+        os.remove("watermark.pdf")
+        os.remove("watermark_test_image.pdf")
     
     def test_merge_pages(self):
         self.d.pages = ["tests/test_pdf.pdf", "tests/test_text_pdf.pdf"]
@@ -113,35 +119,84 @@ class TestDocument:
         reader = PdfReader("tests/test_pdf.pdf")
         page = reader.pages[0]
         out = self.d.merge_watermark_pdf(page, "tests/test.pdf")
-        assert type(out) == _page
+        assert type(out) == _page.PageObject
     
     def test_merge_as_stamp(self):
         reader = PdfReader("tests/test_pdf.pdf")
         page = reader.pages[0]
         out = self.d.merge_as_stamp(page, "tests/test.pdf")
-        assert type(out) == _page
+        assert type(out) == _page.PageObject
     
     def test_merge_as_watermark(self):
         reader = PdfReader("tests/test_pdf.pdf")
         page = reader.pages[0]
         out = self.d.merge_as_watermark(page, "tests/test.pdf")
-        assert type(out) == _page
+        assert type(out) == _page.PageObject
     
     def test_encrypt(self):
         shutil.copyfile("tests/test_pdf.pdf", "tests/test_encrypt.pdf")
         self.d.encrypt("tests/test_encrypt.pdf")
         reader = PdfReader("tests/test_encrypt.pdf")
         with pytest.raises(errors.PdfReadError):
-            reader.documentInfo
+            reader.metadata
         # With wrong password
         result = reader.decrypt("wrong")
         assert result.name == "NOT_DECRYPTED"
         result = reader.decrypt(self.d.password)
         assert result.name == "OWNER_PASSWORD"
         # Now we can read document info
-        reader.documentInfo
+        reader.metadata
         os.remove("tests/test_encrypt.pdf")
     
     # def test_convert_file(self):
     #     self.d.convert_file_to_pdf("tests/test_file.docx")
     #     assert os.path.exists("test_file.pdf")
+
+class TestWatermark:
+
+    def setup_method(self):
+        self.w = Watermark("test")
+
+    @mock.patch.object(Watermark, "_create_image_with_watermark")
+    def test_add_watermark_image(self, mock):
+        self.w.path = "tests/test_image.jpeg"
+        self.w.add_watermark()
+        mock.assert_called()
+    
+    @mock.patch.object(Watermark, "_create_pdf_with_watermark")
+    def test_add_watermark_pdf(self, mock):
+        self.w.path = "tests/test_pdf.pdf"
+        self.w.add_watermark()
+        mock.assert_called()
+    
+    def test_create_image_with_watermark(self):
+        self.w.path = "tests/test_image.jpeg"
+        filename = self.w._create_image_with_watermark()
+        assert filename == "tests/watermark_test_image.jpeg"
+        assert os.path.exists("tests/watermark_test_image.jpeg")
+        os.remove("tests/watermark_test_image.jpeg")
+    
+    def test_create_pdf_with_watermark(self):
+        self.w.dimensions = (595, 842,)
+        filename = self.w._create_pdf_with_watermark()
+        assert filename == "watermark.pdf"
+        assert os.path.exists("watermark.pdf")
+        os.remove("watermark.pdf")
+    
+    def test_get_right_font_pil(self):
+        font = self.w._get_right_font_pil(500)
+        assert type(font) == ImageFont.FreeTypeFont
+    
+    def test_get_center_width(self):
+        res = self.w._get_center_width(200, 50)
+        assert res == 75
+    
+    def test_get_center_length(self):
+        font = ImageFont.truetype("Roboto-Bold.ttf", size=20)
+        res = self.w._get_center_length(200, font)
+        assert res == 93
+    
+    def test_get_text_height(self):
+        font = ImageFont.truetype("Roboto-Bold.ttf", size=20)
+        res = self.w._get_text_height(font)
+        assert res == 14
