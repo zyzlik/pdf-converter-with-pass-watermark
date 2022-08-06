@@ -26,28 +26,49 @@ class BaseFile:
     def __init__(self) -> None:
         pass
 
-    def get_extension(self, path):
+    def get_extension(self, path: str):
+        """
+        Returns file's extension
+        """
         return os.path.splitext(path)[-1]
     
-    def get_filename(self, path):
+    def get_filename(self, path: str):
+        """
+        Returns name of the file without folder name
+        """
         _, filename = os.path.split(path)
         return filename
     
-    def get_filename_no_ext(self, path):
+    def get_filename_no_ext(self, path: str):
+        """
+        Returns name of the file without folder and extension
+        """
         _, filename = os.path.split(path)
         filename_no_ext = os.path.splitext(filename)[0]
         return filename_no_ext
     
-    def add_prefix_to_filename(self, path, prefix):
+    def add_prefix_to_filename(self, path: str, prefix: str):
+        """
+        Adds prefix to the file name
+        """
         folder, filename = os.path.split(path)
         filename = f"{prefix}_{filename}"
         return os.path.join(folder, filename)
     
-    def change_extension(self, path, new_ext):
+    def change_extension(self, path: str, new_ext: str):
+        """
+        Changes extension of the file name
+        """
         folder, filename = os.path.split(path)
         filename_no_ext = os.path.splitext(filename)[0]
         filename = f"{filename_no_ext}.{new_ext}"
         return os.path.join(folder, filename)
+    
+    def delete_file(self, path: str):
+        """
+        Deletes file
+        """
+        os.remove(path)
 
 
 class Document(BaseFile):
@@ -59,6 +80,7 @@ class Document(BaseFile):
         :param watermark str: watermark word
         """
 
+        print("Initiating document...")
         self.files = files
         self.password = password
         self.watermark = watermark
@@ -81,11 +103,12 @@ class Document(BaseFile):
                 pdf = self.convert_file_to_pdf(f)
                 pdf = self.apply_pdf_watermark(pdf)
             if self.get_extension(f) in PDF_EXTENSIONS:
-                self.apply_pdf_watermark(f)
-                pdf = f
+                pdf = self.apply_pdf_watermark(f)
             self.pages.append(pdf)
         self.merge_pages()
         self.encrypt(FINAL_PDF_PATH)
+        self.cleanup()
+        return FINAL_PDF_PATH
     
     def merge_pages(self):
         merger = PdfMerger()
@@ -116,6 +139,7 @@ class Document(BaseFile):
 
         filename = self.get_filename_no_ext(path)
         pdf.output(f"{filename}.pdf")
+        self.delete_file(path)
         return f"{filename}.pdf"
     
     # def convert_file_to_pdf(self, path):
@@ -144,18 +168,14 @@ class Document(BaseFile):
             height = ceil(page.mediabox.height)
             w = Watermark(self.watermark, dimensions=(width, height))
             filename = w.add_watermark()
-            new_page = self.merge_watermark_pdf(page, filename)
+            new_page = self.merge_as_stamp(page, filename)
             writer.add_page(new_page)
+            self.delete_file(filename)
         new_filename = self.add_prefix_to_filename(f, "watermark")
         with open(new_filename, "wb") as fb:
             writer.write(fb)
+        self.delete_file(f)
         return new_filename
-    
-    def merge_watermark_pdf(self, page, watermark):
-        if not page.extract_text():
-            return self.merge_as_stamp(page, watermark)
-        else:
-            return self.merge_as_watermark(page, watermark)
     
     def merge_as_stamp(self, page: _page.PageObject, watermark: str):
         """
@@ -172,21 +192,6 @@ class Document(BaseFile):
         page.merge_page(watermark)
         page.mediabox = mediabox
         return page
-    
-    def merge_as_watermark(self, page: _page.PageObject, watermark: str):
-        """
-        For digital-generated PDF we can put watermark under the page content
-        """
-
-        print("Adding watermark underneath the page")
-        watermark_reader = PdfReader(watermark)
-        watermark = watermark_reader.pages[0]
-        
-        mediabox = page.mediabox
-
-        watermark.merge_page(page)
-        watermark.mediabox = mediabox
-        return watermark
 
     def encrypt(self, path):
         """
@@ -205,6 +210,10 @@ class Document(BaseFile):
         # Save the new PDF to a file
         with open(path, "wb") as f:
             writer.write(f)
+    
+    def cleanup(self):
+        for f in self.pages:
+            self.delete_file(f)
 
 
 class Watermark(BaseFile):
@@ -257,6 +266,7 @@ class Watermark(BaseFile):
         filename = self.change_extension(self.path, "jpeg")
         new_filename = self.add_prefix_to_filename(filename, "watermark")
         out.save(new_filename)
+        self.delete_file(self.path)
         return new_filename
     
     def _create_pdf_with_watermark(self):

@@ -1,6 +1,8 @@
 version: '3'
 services:
     backend:
+        environment:
+        - LOCAL=1
         build: .
         ports:
             - "5000:5000"
