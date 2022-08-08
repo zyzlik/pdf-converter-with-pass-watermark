@@ -1,5 +1,6 @@
 from math import floor, ceil
 import os
+import subprocess
 
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -130,8 +131,8 @@ class Document(BaseFile):
     def convert_image_to_pdf(self, path):
         """
         Convert image files to PDF, saves locally
+        :param path: path to a file
         """
-
         print("Converting {} to pdf".format(path))
         pdf = FPDF("P", 'mm', 'A4')
         pdf.add_page()
@@ -142,16 +143,23 @@ class Document(BaseFile):
         self.delete_file(path)
         return f"{filename}.pdf"
     
-    # def convert_file_to_pdf(self, path):
-    #     filename = self.get_filename(path)
-    #     convert(path, f"{filename}.pdf")
+    def convert_file_to_pdf(self, path):
+        """
+        convert a doc or docx document to PDF
+        :param path: path to a file
+        """
+        cmd = 'libreoffice --convert-to pdf'.split() + [path]
+        p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        p.wait(timeout=10)
+        _, stderr = p.communicate()
+        if stderr:
+            raise subprocess.SubprocessError(stderr)
         
     def apply_image_watermark(self, f):
         """
         Apply watermark to a file
         :param f str: file path
         """
-
         w = Watermark(self.watermark, f=f)
         filename = w.add_watermark()
         return filename
