@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 from unittest import mock
@@ -64,7 +65,8 @@ class TestFileUpload:
         )
         assert response.status_code == 200
         assert "static" in response.data.decode('utf-8')
-        os.remove("static/document.pdf")
+        data = json.loads(response.data)
+        os.remove(data["link"])
 
 class TestDocument:
 
@@ -87,9 +89,9 @@ class TestDocument:
             password="qwerty",
             watermark="kseniia"
         )
-        d.process()
-        assert os.path.exists("document.pdf")
-        os.remove("document.pdf")
+        filename = d.process()
+        assert os.path.exists(filename)
+        os.remove(filename)
     
     def test_merge_pages(self):
         self.d.pages = ["tests/test_pdf.pdf", "tests/test_text_pdf.pdf"]
