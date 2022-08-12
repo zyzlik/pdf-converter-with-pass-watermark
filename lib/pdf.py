@@ -1,3 +1,4 @@
+from datetime import datetime
 from math import floor, ceil
 import os
 import subprocess
@@ -10,7 +11,7 @@ from PyPDF2 import PdfMerger, PdfReader, PdfWriter, _page
 
 A4_SIZE = (595, 842,)
 FILE_EXTENSIONS = {".docx", ".doc"}
-FINAL_PDF_PATH = "document.pdf"
+FINAL_PDF_NAME = "document"
 FONT_START_SIZE = 200
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff"}
 PADDING = 20
@@ -71,6 +72,10 @@ class BaseFile:
         Deletes file
         """
         os.remove(path)
+    
+    def generate_filename(self):
+        ts = datetime.now().timestamp()
+        return f"{FINAL_PDF_NAME}.{ts}.pdf"
 
 
 class Document(BaseFile):
@@ -89,6 +94,7 @@ class Document(BaseFile):
         # List of pdf docs paths to merge at the end
         self.pages = list()
         self.allowed_formats = (".pdf", ".docx", ".png", ".jpg", ".jpeg")
+        self.filename = self.generate_filename()
     
     def process(self):
         """
@@ -108,16 +114,16 @@ class Document(BaseFile):
             if self.get_extension(f) in PDF_EXTENSIONS:
                 pdf = self.apply_pdf_watermark(f)
             self.pages.append(pdf)
-        self.merge_pages()
-        self.encrypt(FINAL_PDF_PATH)
+        self.merge_pages(self.filename)
+        self.encrypt(self.filename)
         self.cleanup()
-        return FINAL_PDF_PATH
+        return self.filename
     
-    def merge_pages(self):
+    def merge_pages(self, path):
         merger = PdfMerger()
         for pdf in self.pages:
             merger.append(pdf)
-        merger.write(FINAL_PDF_PATH)
+        merger.write(path)
         merger.close()
     
     def validate_all(self):

@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 from unittest import mock
@@ -8,7 +9,8 @@ import pytest
 from werkzeug.datastructures import FileStorage
 
 from app import app
-from lib.pdf import BaseFile, Document, Watermark, UnprocessibleFileException, FINAL_PDF_PATH
+from lib.pdf import BaseFile, Document, Watermark, UnprocessibleFileException
+from lib.aws import save_file_to_s3
 
 def test_ping():
     # Create a test client using the Flask application configured for testing
@@ -41,6 +43,11 @@ class TestBaseFile:
     def test_change_extension(self):
         filename = self.b.change_extension("tests/test_file.docx", "png")
         assert filename == "tests/test_file.png"
+    
+    def test_generate_filename(self):
+        filename = self.b.generate_filename()
+        assert type(filename) == str
+        assert "document" in filename
 
 class TestFileUpload:
     def test_post_one_file(self):
@@ -58,7 +65,8 @@ class TestFileUpload:
         )
         assert response.status_code == 200
         assert "static" in response.data.decode('utf-8')
-        os.remove("static/document.pdf")
+        data = json.loads(response.data)
+        os.remove(data["link"])
 
 class TestDocument:
 
@@ -81,17 +89,17 @@ class TestDocument:
             password="qwerty",
             watermark="kseniia"
         )
-        d.process()
-        assert os.path.exists("document.pdf")
-        os.remove("document.pdf")
+        filename = d.process()
+        assert os.path.exists(filename)
+        os.remove(filename)
     
     def test_merge_pages(self):
         self.d.pages = ["tests/test_pdf.pdf", "tests/test_text_pdf.pdf"]
-        self.d.merge_pages()
-        assert os.path.exists("document.pdf")
-        reader = PdfReader("document.pdf")
+        self.d.merge_pages("kseniia.pdf")
+        assert os.path.exists("kseniia.pdf")
+        reader = PdfReader("kseniia.pdf")
         assert len(reader.pages) == 8
-        os.remove("document.pdf")
+        os.remove("kseniia.pdf")
     
     def test_convert_image(self):
         self.d.convert_image_to_pdf("tests/test_image.jpeg")
