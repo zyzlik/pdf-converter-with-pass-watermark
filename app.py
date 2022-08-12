@@ -1,10 +1,14 @@
+import os
 import shutil
 
 from flask import Flask, request, render_template, make_response, jsonify
 
+from lib.aws import save_file_to_s3, BUCKET_NAME
 from lib.pdf import Document
 
 app = Flask("PDF-coverter")
+app.config["AWS_ACCESS_KEY_ID"] = os.environ.get("AWS_ACCESS_KEY_ID", "")
+app.config["AWS_SECRET_ACCESS_KEY"] = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
 
 @app.route('/ping')
 def ping():
@@ -35,8 +39,8 @@ def main():
         link = save_locally(path)
     else:
         # upload to S3
-        # https://stackoverflow.com/questions/53146615/getting-file-url-after-upload-amazon-s3-python-boto3
-        link = "s3://..."
+        save_file_to_s3(path, app.config["AWS_ACCESS_KEY_ID"], app.config["AWS_SECRET_ACCESS_KEY"])
+        link = f"https://{BUCKET_NAME}.s3.amazonaws.com/{path}"
     
     resp = {'link': link}
     return make_response(jsonify(resp), 200)
@@ -52,7 +56,6 @@ def save_locally(filename):
     new_filename = f"static/{filename}"
     shutil.move(filename, new_filename)
     return new_filename
-
 
 
 if __name__ == "__main__":
