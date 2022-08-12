@@ -1,6 +1,7 @@
 from math import floor, ceil
 import os
 import subprocess
+from sys import platform
 
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -8,10 +9,10 @@ from PyPDF2 import PdfMerger, PdfReader, PdfWriter, _page
 
 
 A4_SIZE = (595, 842,)
-FILE_EXTENSIONS = {".docx"}
+FILE_EXTENSIONS = {".docx", ".doc"}
 FINAL_PDF_PATH = "document.pdf"
 FONT_START_SIZE = 200
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff"}
 PADDING = 20
 PDF_EXTENSIONS = {".pdf"}
 WATERMARK_COLOR = (128, 128, 128, 100)
@@ -100,6 +101,7 @@ class Document(BaseFile):
             if self.get_extension(f) in IMAGE_EXTENSIONS:
                 filename = self.apply_image_watermark(f)
                 pdf = self.convert_image_to_pdf(filename)
+                self.delete_file(filename)
             if self.get_extension(f) in FILE_EXTENSIONS:
                 pdf = self.convert_file_to_pdf(f)
                 pdf = self.apply_pdf_watermark(pdf)
@@ -140,7 +142,6 @@ class Document(BaseFile):
 
         filename = self.get_filename_no_ext(path)
         pdf.output(f"{filename}.pdf")
-        self.delete_file(path)
         return f"{filename}.pdf"
     
     def convert_file_to_pdf(self, path):
@@ -148,7 +149,10 @@ class Document(BaseFile):
         convert a doc or docx document to PDF
         :param path: path to a file
         """
-        cmd = 'libreoffice --convert-to pdf'.split() + [path]
+        if platform == "linux":
+            cmd = 'libreoffice --convert-to pdf'.split() + [path]
+        elif platform == "darwin":
+            cmd = '/Applications/LibreOffice.app/Contents/MacOS/soffice --convert-to pdf'.split() + [path]
         p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         p.wait(timeout=10)
         _, stderr = p.communicate()
@@ -182,7 +186,7 @@ class Document(BaseFile):
         new_filename = self.add_prefix_to_filename(f, "watermark")
         with open(new_filename, "wb") as fb:
             writer.write(fb)
-        self.delete_file(f)
+        # self.delete_file(f)
         return new_filename
     
     def merge_as_stamp(self, page: _page.PageObject, watermark: str):
@@ -274,7 +278,6 @@ class Watermark(BaseFile):
         filename = self.change_extension(self.path, "jpeg")
         new_filename = self.add_prefix_to_filename(filename, "watermark")
         out.save(new_filename)
-        self.delete_file(self.path)
         return new_filename
     
     def _create_pdf_with_watermark(self):

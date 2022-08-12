@@ -50,13 +50,14 @@ class TestFileUpload:
             filename="test_pdf.pdf",
             content_type="application/pdf",
         )
+        app.config["ENV"] = "development"
         response = app.test_client().post(
             "/",
             data={"document": my_file},
             content_type="multipart/form-data",
         )
         assert response.status_code == 200
-        assert response.data.decode('utf-8') == '{"link":"https://example.com"}\n'
+        assert "static" in response.data.decode('utf-8')
 
 class TestDocument:
 
@@ -115,22 +116,10 @@ class TestDocument:
         os.remove("watermark.pdf")
         os.remove("tests/watermark_test_pdf.pdf")
     
-    def test_merge_watermark_pdf(self):
-        reader = PdfReader("tests/test_pdf.pdf")
-        page = reader.pages[0]
-        out = self.d.merge_watermark_pdf(page, "tests/test.pdf")
-        assert type(out) == _page.PageObject
-    
     def test_merge_as_stamp(self):
         reader = PdfReader("tests/test_pdf.pdf")
         page = reader.pages[0]
         out = self.d.merge_as_stamp(page, "tests/test.pdf")
-        assert type(out) == _page.PageObject
-    
-    def test_merge_as_watermark(self):
-        reader = PdfReader("tests/test_pdf.pdf")
-        page = reader.pages[0]
-        out = self.d.merge_as_watermark(page, "tests/test.pdf")
         assert type(out) == _page.PageObject
     
     def test_encrypt(self):
@@ -148,9 +137,10 @@ class TestDocument:
         reader.metadata
         os.remove("tests/test_encrypt.pdf")
     
-    # def test_convert_file(self):
-    #     self.d.convert_file_to_pdf("tests/test_file.docx")
-    #     assert os.path.exists("test_file.pdf")
+    def test_convert_file(self):
+        self.d.convert_file_to_pdf("tests/test_file.docx")
+        assert os.path.exists("test_file.pdf")
+        os.remove("test_file.pdf")
 
 class TestWatermark:
 
