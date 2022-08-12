@@ -53,11 +53,12 @@ class TestFileUpload:
         app.config["ENV"] = "development"
         response = app.test_client().post(
             "/",
-            data={"document": my_file},
+            data={"document": my_file, "watermark": "qwerty", "password": 123},
             content_type="multipart/form-data",
         )
         assert response.status_code == 200
         assert "static" in response.data.decode('utf-8')
+        os.remove("static/document.pdf")
 
 class TestDocument:
 
@@ -83,10 +84,6 @@ class TestDocument:
         d.process()
         assert os.path.exists("document.pdf")
         os.remove("document.pdf")
-        os.remove("tests/watermark_test_image.jpeg")
-        os.remove("tests/watermark_test_pdf.pdf")
-        os.remove("watermark.pdf")
-        os.remove("watermark_test_image.pdf")
     
     def test_merge_pages(self):
         self.d.pages = ["tests/test_pdf.pdf", "tests/test_text_pdf.pdf"]
@@ -113,7 +110,6 @@ class TestDocument:
         filename = self.d.apply_pdf_watermark("tests/test_pdf.pdf")
         assert filename == "tests/watermark_test_pdf.pdf"
         assert os.path.exists("tests/watermark_test_pdf.pdf")
-        os.remove("watermark.pdf")
         os.remove("tests/watermark_test_pdf.pdf")
     
     def test_merge_as_stamp(self):
