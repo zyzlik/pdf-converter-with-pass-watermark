@@ -1,4 +1,4 @@
-name: CI
+name: Build and Upload
 
 on:
   push:
@@ -12,15 +12,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: install dependencies
+      - name: docker build
         env:
           AWS_ACCESS_KEY_ID: "${{secrets.AWS_ACCESS_KEY_ID}}"
           AWS_SECRET_ACCESS_KEY: "${{secrets.AWS_SECRET_ACCESS_KEY}}"
         run: |
-          docker build . \
+          docker build . -t 801176112578.dkr.ecr.us-east-1.amazonaws.com/pdf-backend:latest \
           --build-arg AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
           --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-          --build-arg FLASK_ENV="production"
+          --build-arg FLASK_ENV="production" 
 
       - name: push
         run: |
