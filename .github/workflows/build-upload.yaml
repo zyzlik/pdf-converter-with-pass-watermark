@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment: production
+    environment: prod
 
     steps:
       - uses: actions/checkout@v3
@@ -24,8 +24,8 @@ jobs:
 
       - name: docker build
         env:
-          AWS_ACCESS_KEY_ID: "${{secrets.AWS_ACCESS_KEY_ID}}"
-          AWS_SECRET_ACCESS_KEY: "${{secrets.AWS_SECRET_ACCESS_KEY}}"
+          AWS_ACCESS_KEY_ID: "${{ secrets.AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.AWS_SECRET_ACCESS_KEY }}"
         run: |
           docker build . -t 801176112578.dkr.ecr.us-east-1.amazonaws.com/pdf-backend:latest \
           --build-arg AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
