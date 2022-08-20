@@ -40,8 +40,9 @@
             
             $("#uploadForm").hide();
             var link = `<a href="${response.link}">Download PDF</a>`
+            var error = `<p>${response.error}</p>`
             $("#response").html(link)
-
+            $("#response").html(error)
           },
           error: function(xhr) {
             console.log('error')

@@ -25,24 +25,29 @@ def main():
     files = []
     error = ""
     for f in request.files.getlist('files'):
-        f.save(f.filename)
-        files.append(f.filename)
-    password = request.form["password"]
-    watermark = request.form["watermark"]
-    d = Document(files, password, watermark)
-    d.validate_all()
-    path = d.process()
-
-    link = ""
-    if app.config["ENV"] == "development":
-        # save file locally
-        link = save_locally(path)
+        if f.filename:
+            f.save(f.filename)
+            files.append(f.filename)
+    password = request.form.get("password")
+    watermark = request.form.get("watermark")
+    if not files or not password or not watermark:
+        error = "Something is missing, please fill out all the fields of the form"
+    if not error:
+        d = Document(files, password, watermark)
+        d.validate_all()
+        path = d.process()
+        link = ""
+        if app.config["ENV"] == "development":
+            # save file locally
+            link = save_locally(path)
+        else:
+            # upload to S3
+            save_file_to_s3(path, app.config["AWS_ACCESS_KEY_ID"], app.config["AWS_SECRET_ACCESS_KEY"])
+            link = f"https://{BUCKET_NAME}.s3.amazonaws.com/{path}"
+    if error:
+        resp = {'error': error}
     else:
-        # upload to S3
-        save_file_to_s3(path, app.config["AWS_ACCESS_KEY_ID"], app.config["AWS_SECRET_ACCESS_KEY"])
-        link = f"https://{BUCKET_NAME}.s3.amazonaws.com/{path}"
-    
-    resp = {'link': link}
+        resp = {'link': link}
     return make_response(jsonify(resp), 200)
 
 @app.route('/', methods=['GET'])
@@ -53,6 +58,7 @@ def home():
     return render_template('form.html')
 
 def save_locally(filename):
+    print("Saving locally...")
     new_filename = f"static/{filename}"
     shutil.move(filename, new_filename)
     return new_filename
