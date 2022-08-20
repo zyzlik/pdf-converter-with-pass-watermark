@@ -24,7 +24,7 @@ def main():
     """
     files = []
     error = ""
-    for f in request.files.getlist('files'):
+    for f in request.files.getlist('document'):
         if f.filename:
             f.save(f.filename)
             files.append(f.filename)
