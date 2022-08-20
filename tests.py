@@ -60,7 +60,7 @@ class TestFileUpload:
         app.config["ENV"] = "development"
         response = app.test_client().post(
             "/",
-            data={"document": my_file, "watermark": "qwerty", "password": "123"},
+            data={"files": my_file, "watermark": "qwerty", "password": "123"},
             content_type="multipart/form-data",
         )
         assert response.status_code == 200
@@ -78,7 +78,7 @@ class TestFileUpload:
         app.config["ENV"] = "development"
         response = app.test_client().post(
             "/",
-            data={"document": my_file, "watermark": "qwerty"},
+            data={"files": my_file, "watermark": "qwerty"},
             content_type="multipart/form-data",
         )
         assert response.status_code == 200

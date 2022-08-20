@@ -24,13 +24,17 @@ def main():
     """
     files = []
     error = ""
-    for f in request.files.getlist('document'):
+    print(request.files)
+    for f in request.files.getlist('files'):
         if f.filename:
             f.save(f.filename)
             files.append(f.filename)
     password = request.form.get("password")
     watermark = request.form.get("watermark")
     if not files or not password or not watermark:
+        print(files)
+        print(password == "")
+        print(watermark)
         error = "Something is missing, please fill out all the fields of the form"
     if not error:
         d = Document(files, password, watermark)
@@ -42,8 +46,11 @@ def main():
             link = save_locally(path)
         else:
             # upload to S3
-            save_file_to_s3(path, app.config["AWS_ACCESS_KEY_ID"], app.config["AWS_SECRET_ACCESS_KEY"])
-            link = f"https://{BUCKET_NAME}.s3.amazonaws.com/{path}"
+            result = save_file_to_s3(path, app.config["AWS_ACCESS_KEY_ID"], app.config["AWS_SECRET_ACCESS_KEY"])
+            if result:
+                link = f"https://{BUCKET_NAME}.s3.amazonaws.com/{path}"
+            else:
+                error = "Can't upload to S3"
     if error:
         resp = {'error': error}
     else:
