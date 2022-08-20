@@ -60,13 +60,30 @@ class TestFileUpload:
         app.config["ENV"] = "development"
         response = app.test_client().post(
             "/",
-            data={"document": my_file, "watermark": "qwerty", "password": 123},
+            data={"document": my_file, "watermark": "qwerty", "password": "123"},
             content_type="multipart/form-data",
         )
         assert response.status_code == 200
         assert "static" in response.data.decode('utf-8')
         data = json.loads(response.data)
         os.remove(data["link"])
+    
+    def test_missing_arg(self):
+        pdf_file = os.path.join("tests/test_pdf.pdf")
+        my_file = FileStorage(
+            stream=open(pdf_file, "rb"),
+            filename="test_pdf.pdf",
+            content_type="application/pdf",
+        )
+        app.config["ENV"] = "development"
+        response = app.test_client().post(
+            "/",
+            data={"document": my_file, "watermark": "qwerty"},
+            content_type="multipart/form-data",
+        )
+        assert response.status_code == 200
+        assert "missing" in response.data.decode('utf-8')
+        os.remove("test_pdf.pdf")
 
 class TestDocument:
 

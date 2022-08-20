@@ -17,4 +17,5 @@ WORKDIR /code
 RUN apt-get update && apt-get -y install libreoffice
 RUN libreoffice --version
 RUN pip install -r requirements.txt
+
 CMD ["python", "app.py"]
