@@ -159,11 +159,10 @@ class Document(BaseFile):
             cmd = 'libreoffice --convert-to pdf'.split() + [path]
         elif platform == "darwin":
             cmd = '/Applications/LibreOffice.app/Contents/MacOS/soffice --convert-to pdf'.split() + [path]
-        p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        p.wait(timeout=10)
-        _, stderr = p.communicate()
-        if stderr:
-            raise subprocess.SubprocessError(stderr)
+        p = subprocess.run(cmd)
+        if p.returncode:
+            raise subprocess.SubprocessError(p.stderr)
+        return self.change_extension(path, "pdf")
         
     def apply_image_watermark(self, f):
         """
